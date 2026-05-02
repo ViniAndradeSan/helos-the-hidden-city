@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { districts } from '@/lib/data/districts'
@@ -87,8 +87,7 @@ const decorativeElements = [
 ]
 
 // ===========================
-// ELEMENTOS "SUSPEITOS" (leve interação no hover, mas sem conteúdo real)
-// Parecem clicáveis mas só mostram texto curto
+// ELEMENTOS "SUSPEITOS"
 // ===========================
 type SuspectElement = {
   id: string
@@ -101,46 +100,40 @@ type SuspectElement = {
 }
 
 const suspectElements: SuspectElement[] = [
-  // Porto - muitos pontos espalhados (sensação de movimento)
   { id: 'sus-caixotes', cx: 125, cy: 405, district: 'porto', label: 'Caixotes', hint: 'Apenas caixas de mercadorias.', shape: 'square' },
   { id: 'sus-rede', cx: 175, cy: 385, district: 'porto', label: 'Redes', hint: 'Redes de pesca secando ao sol.', shape: 'circle' },
   { id: 'sus-barril-porto', cx: 145, cy: 360, district: 'porto', label: 'Barris', hint: 'Cheiram a peixe salgado.', shape: 'circle' },
   { id: 'sus-ancora', cx: 235, cy: 415, district: 'porto', label: 'Âncora', hint: 'Uma âncora enferrujada.', shape: 'diamond' },
   { id: 'sus-cordas', cx: 108, cy: 378, district: 'porto', label: 'Cordas', hint: 'Cordas entrelaçadas no chão.', shape: 'circle' },
   { id: 'sus-mastro', cx: 200, cy: 395, district: 'porto', label: 'Mastro', hint: 'Um mastro quebrado.', shape: 'square' },
-  
-  // Mercado - densidade alta (muitos elementos próximos)
+
   { id: 'sus-barraca1', cx: 295, cy: 210, district: 'mercado', label: 'Barraca', hint: 'Frutas e legumes coloridos.', shape: 'square' },
   { id: 'sus-barraca2', cx: 335, cy: 195, district: 'mercado', label: 'Barraca', hint: 'Tecidos e roupas usadas.', shape: 'square' },
   { id: 'sus-barraca3', cx: 375, cy: 210, district: 'mercado', label: 'Barraca', hint: 'Especiarias aromáticas.', shape: 'square' },
   { id: 'sus-carroça', cx: 310, cy: 280, district: 'mercado', label: 'Carroça', hint: 'Carroça de um mercador.', shape: 'diamond' },
   { id: 'sus-poço', cx: 280, cy: 240, district: 'mercado', label: 'Poço', hint: 'Um poço de água limpa.', shape: 'circle' },
   { id: 'sus-estatua-mercado', cx: 355, cy: 250, district: 'mercado', label: 'Estátua', hint: 'Estátua de um comerciante famoso.', shape: 'diamond' },
-  
-  // Cidadela - poucos pontos, bem escondidos (sensação de ordem)
+
   { id: 'sus-guarda', cx: 475, cy: 145, district: 'cidadela', label: 'Sentinela', hint: 'Um guarda imóvel.', shape: 'diamond' },
   { id: 'sus-bandeira', cx: 505, cy: 85, district: 'cidadela', label: 'Bandeira', hint: 'A bandeira de Helos tremula.', shape: 'square' },
-  
-  // Artífices - elementos ligados a objetos (forja, engrenagens)
+
   { id: 'sus-bigorna', cx: 505, cy: 245, district: 'artifices', label: 'Bigorna', hint: 'Uma bigorna quente.', shape: 'square' },
   { id: 'sus-engrenagem', cx: 545, cy: 285, district: 'artifices', label: 'Engrenagem', hint: 'Engrenagens enferrujadas.', shape: 'circle' },
   { id: 'sus-ferramentas', cx: 465, cy: 305, district: 'artifices', label: 'Ferramentas', hint: 'Martelos e alicates.', shape: 'square' },
   { id: 'sus-chaminé', cx: 520, cy: 225, district: 'artifices', label: 'Chaminé', hint: 'Fumaça constante sobe.', shape: 'circle' },
   { id: 'sus-sucata', cx: 485, cy: 330, district: 'artifices', label: 'Sucata', hint: 'Peças de metal empilhadas.', shape: 'square' },
-  
-  // Viela - segredos escondidos em cantos (baixa visibilidade)
+
   { id: 'sus-lixo', cx: 305, cy: 385, district: 'viela', label: 'Entulho', hint: 'Lixo e trapos velhos.', shape: 'circle' },
   { id: 'sus-escada', cx: 415, cy: 380, district: 'viela', label: 'Escada', hint: 'Escada quebrada.', shape: 'square' },
   { id: 'sus-porta-viela', cx: 340, cy: 400, district: 'viela', label: 'Porta', hint: 'Uma porta trancada.', shape: 'square' },
-  
-  // Jardins - elementos orgânicos e espaçados
+
   { id: 'sus-fonte', cx: 165, cy: 235, district: 'jardins', label: 'Fonte', hint: 'Água cristalina jorra suavemente.', shape: 'circle' },
   { id: 'sus-banco', cx: 135, cy: 195, district: 'jardins', label: 'Banco', hint: 'Um banco de pedra antiga.', shape: 'square' },
   { id: 'sus-flores', cx: 195, cy: 210, district: 'jardins', label: 'Flores', hint: 'Flores silvestres perfumadas.', shape: 'circle' },
 ]
 
 // ===========================
-// ELEMENTOS SECRETOS REAIS (muito sutis, revelar segredos)
+// ELEMENTOS SECRETOS REAIS
 // ===========================
 type SecretElement = {
   id: string
@@ -152,35 +145,29 @@ type SecretElement = {
 }
 
 const secretElements: SecretElement[] = [
-  // Porto
   { id: 'secret-contrabandista', cx: 128, cy: 425, district: 'porto', hint: 'Há algo estranho entre os caixotes...', shape: 'crack' },
   { id: 'secret-lanterna-apagada', cx: 78, cy: 383, district: 'porto', hint: 'Esta lanterna nunca acende.', shape: 'symbol' },
   { id: 'secret-ancora-enterrada', cx: 215, cy: 448, district: 'porto', hint: 'Uma corrente some na areia.', shape: 'circle' },
-  
-  // Mercado
+
   { id: 'secret-fonte-central', cx: 322, cy: 268, district: 'mercado', hint: 'Algo brilha no fundo da água...', shape: 'circle' },
   { id: 'secret-placa-loja', cx: 288, cy: 178, district: 'mercado', hint: 'Letras quase apagadas.', shape: 'rune' },
-  
-  // Cidadela
+
   { id: 'secret-estatua-olhos', cx: 423, cy: 168, district: 'cidadela', hint: 'Os olhos parecem seguir você.', shape: 'symbol' },
   { id: 'secret-jardim-torre', cx: 518, cy: 98, district: 'cidadela', hint: 'Uma porta quase invisível.', shape: 'crack' },
-  
-  // Artífices
+
   { id: 'secret-automato-antigo', cx: 538, cy: 298, district: 'artifices', hint: 'Esta sucata parece... respirar?', shape: 'symbol' },
   { id: 'secret-chamine-mensagens', cx: 495, cy: 243, district: 'artifices', hint: 'A fumaça forma padrões estranhos.', shape: 'circle' },
-  
-  // Viela
+
   { id: 'secret-guilda-sombras', cx: 385, cy: 435, district: 'viela', hint: 'Uma rachadura profunda demais.', shape: 'crack' },
   { id: 'secret-barril-moedas', cx: 358, cy: 365, district: 'viela', hint: 'Este barril é pesado demais.', shape: 'circle' },
   { id: 'secret-simbolo-porta', cx: 295, cy: 418, district: 'viela', hint: 'Uma marca quase invisível.', shape: 'rune' },
-  
-  // Jardins
+
   { id: 'secret-inscricao-antiga', cx: 178, cy: 248, district: 'jardins', hint: 'Letras de uma era esquecida.', shape: 'rune' },
   { id: 'secret-arvore-oca', cx: 112, cy: 268, district: 'jardins', hint: 'O tronco parece oco.', shape: 'crack' },
 ]
 
 // ===========================
-// FALSOS PONTOS (parecem interativos mas não fazem nada - para aumentar curiosidade)
+// FALSOS PONTOS
 // ===========================
 type FalseElement = {
   id: string
@@ -190,7 +177,6 @@ type FalseElement = {
 }
 
 const falseElements: FalseElement[] = [
-  // Espalhados pela cidade - parecem segredos mas são apenas marcas
   { id: 'false-1', cx: 255, cy: 345, opacity: 0.12 },
   { id: 'false-2', cx: 188, cy: 315, opacity: 0.1 },
   { id: 'false-3', cx: 398, cy: 255, opacity: 0.14 },
@@ -204,7 +190,7 @@ const falseElements: FalseElement[] = [
 ]
 
 // ===========================
-// MICRO-INTERAÇÕES (pequenos detalhes clicáveis que mostram texto)
+// MICRO-INTERAÇÕES
 // ===========================
 type MicroDetail = {
   id: string
@@ -215,28 +201,23 @@ type MicroDetail = {
 }
 
 const microDetails: MicroDetail[] = [
-  // Lanternas espalhadas
   { id: 'micro-lantern-1', cx: 92, cy: 358, icon: 'lantern', text: 'Uma lanterna de óleo.' },
   { id: 'micro-lantern-2', cx: 265, cy: 235, icon: 'lantern', text: 'Luz fraca ilumina a rua.' },
   { id: 'micro-lantern-3', cx: 438, cy: 125, icon: 'lantern', text: 'Uma chama dourada.' },
   { id: 'micro-lantern-4', cx: 378, cy: 345, icon: 'lantern', text: 'Está apagada.' },
-  
-  // Barris
+
   { id: 'micro-barrel-1', cx: 158, cy: 415, icon: 'barrel', text: 'Cheira a vinho.' },
   { id: 'micro-barrel-2', cx: 298, cy: 255, icon: 'barrel', text: 'Água de chuva.' },
   { id: 'micro-barrel-3', cx: 475, cy: 275, icon: 'barrel', text: 'Óleo de máquinas.' },
-  
-  // Placas
+
   { id: 'micro-sign-1', cx: 172, cy: 338, icon: 'sign', text: 'Porto das Marés' },
   { id: 'micro-sign-2', cx: 348, cy: 178, icon: 'sign', text: 'Praça do Mercado' },
   { id: 'micro-sign-3', cx: 458, cy: 228, icon: 'sign', text: 'Oficinas' },
   { id: 'micro-sign-4', cx: 315, cy: 358, icon: 'sign', text: 'Cuidado.' },
-  
-  // Rachaduras no chão
+
   { id: 'micro-crack-1', cx: 245, cy: 295, icon: 'crack', text: 'Uma rachadura antiga.' },
   { id: 'micro-crack-2', cx: 405, cy: 385, icon: 'crack', text: 'O chão está cedendo.' },
-  
-  // Plantas
+
   { id: 'micro-plant-1', cx: 148, cy: 225, icon: 'plant', text: 'Ervas medicinais.' },
   { id: 'micro-plant-2', cx: 205, cy: 255, icon: 'plant', text: 'Musgo antigo.' },
 ]
@@ -247,34 +228,133 @@ interface CityMapProps {
   discoveredSecrets?: string[]
 }
 
+type HoveredElement = {
+  id: string
+  type: 'suspect' | 'secret' | 'micro' | 'false'
+}
+
 export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = [] }: CityMapProps) {
   const router = useRouter()
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [hoveredDistrict, setHoveredDistrict] = useState<string | null>(null)
-  const [hoveredElement, setHoveredElement] = useState<{ id: string; type: 'suspect' | 'secret' | 'micro' | 'false' } | null>(null)
+  const [hoveredElement, setHoveredElement] = useState<HoveredElement | null>(null)
   const [clickedElement, setClickedElement] = useState<string | null>(null)
   const [microText, setMicroText] = useState<{ text: string; x: number; y: number } | null>(null)
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const handleElementInteraction = (
+    element: { id: string; type: 'suspect' | 'secret' | 'micro' | 'false' },
+    e?: React.MouseEvent
+  ) => {
+    if (isMobile) {
+      e?.stopPropagation()
+
+      setHoveredElement(prev =>
+        prev?.id === element.id ? null : element
+      )
+    } else {
+      setHoveredElement(element)
+    }
+  }
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)')
+
+    const check = () => setIsMobile(media.matches)
+    check()
+
+    if (media.addEventListener) {
+      media.addEventListener('change', check)
+      return () => media.removeEventListener('change', check)
+    }
+
+    media.addListener(check)
+    return () => media.removeListener(check)
+  }, [])
+
+    useEffect(() => {
+    if (!isMobile) return
+
+    const handleClickOutside = () => {
+      setHoveredElement(null)
+    }
+
+    window.addEventListener('click', handleClickOutside)
+    return () => window.removeEventListener('click', handleClickOutside)
+  }, [isMobile])
+
+  useEffect(() => {
+    return () => {
+      if (tooltipTimerRef.current) {
+        clearTimeout(tooltipTimerRef.current)
+      }
+    }
+  }, [])
+
+  const clearMobileTooltip = useCallback(() => {
+    if (tooltipTimerRef.current) {
+      clearTimeout(tooltipTimerRef.current)
+      tooltipTimerRef.current = null
+    }
+  }, [])
+
+  const showMobileTooltip = useCallback((id: string, type: HoveredElement['type']) => {
+    setHoveredElement({ id, type })
+    clearMobileTooltip()
+    tooltipTimerRef.current = setTimeout(() => {
+      setHoveredElement(null)
+      tooltipTimerRef.current = null
+    }, 2200)
+  }, [clearMobileTooltip])
+
+  // Som do hover
+  const hoverSound = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const audio = new Audio('/sounds/hover.mp3')
+    audio.volume = 0.15
+    audio.preload = 'auto'
+    return audio
+  }, [])
 
   // Tooltip atual baseado no elemento hover
   const currentTooltip = useMemo(() => {
     if (!hoveredElement) return null
-    
+
     if (hoveredElement.type === 'suspect') {
       const el = suspectElements.find(e => e.id === hoveredElement.id)
       return el ? { label: el.label, hint: el.hint } : null
     }
+
     if (hoveredElement.type === 'secret') {
       const el = secretElements.find(e => e.id === hoveredElement.id)
       const isDiscovered = discoveredSecrets.includes(hoveredElement.id)
       return el ? { label: isDiscovered ? 'Descoberto' : '???', hint: el.hint } : null
     }
+
     if (hoveredElement.type === 'false') {
       return { label: '...', hint: 'Parece ser apenas uma marca antiga.' }
     }
+
     return null
   }, [hoveredElement, discoveredSecrets])
 
+  const parchmentDots = useMemo(
+    () =>
+      Array.from({ length: 20 }, () => ({
+        cx: Math.random() * 650,
+        cy: Math.random() * 520,
+        r: Math.random() * 3 + 0.5,
+      })),
+    []
+  )
+
   const handleDistrictClick = useCallback((district: District) => {
-    router.push(`/distrito/${district.slug}`)
+    setSelectedDistrict(district.id)
+
+    setTimeout(() => {
+      router.push(`/distrito/${district.slug}`)
+    }, 550)
   }, [router])
 
   const handleDistrictHover = useCallback((district: District | null) => {
@@ -282,34 +362,35 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
     onDistrictHover?.(district)
   }, [onDistrictHover])
 
-  const handleSecretClick = useCallback((secretId: string, e: React.MouseEvent) => {
+  const handleSecretClick = useCallback((secretId: string, e: MouseEvent<SVGGElement>) => {
     e.stopPropagation()
     setClickedElement(secretId)
+
     setTimeout(() => setClickedElement(null), 300)
-    
+
     if (!discoveredSecrets.includes(secretId)) {
       onSecretFound?.(secretId)
     }
   }, [discoveredSecrets, onSecretFound])
 
-  const handleMicroClick = useCallback((detail: MicroDetail, e: React.MouseEvent) => {
+  const handleMicroClick = useCallback((detail: MicroDetail, e: MouseEvent<SVGGElement>) => {
     e.stopPropagation()
     setMicroText({ text: detail.text, x: detail.cx, y: detail.cy - 15 })
     setTimeout(() => setMicroText(null), 2500)
   }, [])
 
-  // Renderizar forma baseada no shape
   const renderShape = (shape: string, size: number, isHovered: boolean) => {
     const s = isHovered ? size * 1.3 : size
+
     switch (shape) {
       case 'square':
-        return <rect x={-s/2} y={-s/2} width={s} height={s} transform="rotate(45)" />
+        return <rect x={-s / 2} y={-s / 2} width={s} height={s} transform="rotate(45)" />
       case 'diamond':
         return <polygon points={`0,${-s} ${s},0 0,${s} ${-s},0`} />
       case 'rune':
-        return <path d={`M${-s/2},${-s} L${s/2},${-s} L0,0 L${s/2},${s} L${-s/2},${s} L0,0 Z`} />
+        return <path d={`M${-s / 2},${-s} L${s / 2},${-s} L0,0 L${s / 2},${s} L${-s / 2},${s} L0,0 Z`} />
       case 'crack':
-        return <path d={`M${-s},0 L${-s/3},${-s/2} L0,0 L${s/3},${s/2} L${s},0`} strokeWidth="1.5" fill="none" />
+        return <path d={`M${-s},0 L${-s / 3},${-s / 2} L0,0 L${s / 3},${s / 2} L${s},0`} strokeWidth="1.5" fill="none" />
       case 'symbol':
         return <circle r={s * 0.7} strokeWidth="1" fill="none" />
       default:
@@ -324,13 +405,21 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
         className="w-full h-full"
         style={{ maxHeight: '80vh' }}
       >
-        {/* Definições de filtros e gradientes */}
         <defs>
+          <filter id="fogBlurSoft">
+            <feGaussianBlur stdDeviation="14" />
+          </filter>
+
+          <radialGradient id="fogGradientSoft">
+            <stop offset="0%" stopColor="white" stopOpacity="0" />
+            <stop offset="100%" stopColor="white" stopOpacity="0.22" />
+          </radialGradient>
+
           <radialGradient id="mapBg" cx="50%" cy="50%" r="70%">
             <stop offset="0%" stopColor="hsl(var(--card))" />
             <stop offset="100%" stopColor="hsl(var(--background))" />
           </radialGradient>
-          
+
           <filter id="goldGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" result="blur" />
             <feFlood floodColor="hsl(var(--gold))" floodOpacity="0.5" />
@@ -340,7 +429,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          
+
           <filter id="secretGlow" x="-100%" y="-100%" width="300%" height="300%">
             <feGaussianBlur stdDeviation="2" result="blur" />
             <feFlood floodColor="hsl(var(--gold))" floodOpacity="0.6" />
@@ -376,17 +465,40 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
           </pattern>
         </defs>
 
-        {/* Fundo do mapa com textura sutil */}
+        {/* Fundo do mapa */}
         <rect x="0" y="0" width="650" height="520" fill="url(#mapBg)" />
-        
+
+        <motion.rect
+          x="0"
+          y="0"
+          width="650"
+          height="520"
+          fill="url(#fogGradientSoft)"
+          filter="url(#fogBlurSoft)"
+          animate={{ opacity: isMobile ? [0.08, 0.16, 0.08] : [0.12, 0.22, 0.12] }}
+          transition={{ duration: isMobile ? 14 : 10, repeat: Infinity, ease: 'easeInOut' }}
+          pointerEvents="none"
+        />
+
+        <rect
+          x="0"
+          y="0"
+          width="650"
+          height="520"
+          fill="none"
+          stroke="rgba(255,255,255,0.06)"
+          strokeWidth="18"
+          pointerEvents="none"
+        />
+
         {/* Textura de pergaminho */}
-        <g opacity="0.03">
-          {Array.from({ length: 50 }).map((_, i) => (
+        <g opacity="0.06">
+          {parchmentDots.map((dot, i) => (
             <circle
               key={i}
-              cx={Math.random() * 650}
-              cy={Math.random() * 520}
-              r={Math.random() * 3 + 0.5}
+              cx={dot.cx}
+              cy={dot.cy}
+              r={dot.r}
               fill="hsl(var(--foreground))"
             />
           ))}
@@ -408,6 +520,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 />
               )
             }
+
             if (el.type === 'circle') {
               return (
                 <circle
@@ -421,6 +534,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 />
               )
             }
+
             if (el.type === 'rect') {
               return (
                 <rect
@@ -435,6 +549,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 />
               )
             }
+
             if (el.type === 'tree') {
               return (
                 <g key={i} transform={`translate(${el.cx}, ${el.cy})`}>
@@ -443,6 +558,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 </g>
               )
             }
+
             if (el.type === 'boat') {
               return (
                 <g key={i} transform={`translate(${el.cx}, ${el.cy}) rotate(${el.rotation})`}>
@@ -451,66 +567,130 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 </g>
               )
             }
+
             return null
           })}
         </g>
 
         {/* ===== CAMADA 2: Distritos clicáveis ===== */}
-        <g className="districts">
+        <motion.g
+          className="districts"
+          animate={{
+            scale: selectedDistrict ? 1.05 : 1,
+            x: selectedDistrict ? -8 : 0,
+            y: selectedDistrict ? -5 : 0,
+          }}
+          transition={{ duration: 0.35, ease: 'easeInOut' }}
+        >
           {districts.map((district) => {
             const pathData = districtPaths[district.id]
             if (!pathData) return null
 
             const isHovered = hoveredDistrict === district.id
+            const isSelected = selectedDistrict === district.id
+            const isDimmed = hoveredDistrict ? hoveredDistrict !== district.id : false
 
             return (
               <g key={district.id}>
+                {isSelected && (
+                  <motion.path
+                    d={pathData.path}
+                    fill={district.color}
+                    fillOpacity={0.18}
+                    stroke={district.color}
+                    strokeWidth={10}
+                    strokeOpacity={0.22}
+                    style={{ filter: 'blur(8px)' }}
+                    pointerEvents="none"
+                  />
+                )}
+
                 <motion.path
                   d={pathData.path}
                   fill={district.color}
-                  fillOpacity={isHovered ? 0.35 : 0.15}
+                  fillOpacity={isSelected ? 0.42 : isHovered ? 0.35 : 0.14}
                   stroke={district.color}
-                  strokeWidth={isHovered ? 2.5 : 1.5}
-                  strokeOpacity={isHovered ? 1 : 0.5}
+                  strokeWidth={isSelected ? 4 : isHovered ? 2.5 : 1.2}
+                  strokeOpacity={isDimmed ? 0.15 : isHovered ? 1 : 0.45}
                   className="cursor-pointer"
-                  filter={isHovered ? 'url(#goldGlow)' : undefined}
-                  onClick={() => handleDistrictClick(district)}
-                  onMouseEnter={() => handleDistrictHover(district)}
-                  onMouseLeave={() => handleDistrictHover(null)}
-                  whileHover={{ fillOpacity: 0.35 }}
-                  transition={{ duration: 0.2 }}
+                  filter={isSelected ? 'url(#goldGlow)' : isHovered ? 'url(#goldGlow)' : undefined}
+                  onMouseEnter={() => {
+                    if (!isMobile) handleDistrictHover(district)
+                    if (hoverSound) {
+                      hoverSound.currentTime = 0
+                      hoverSound.play().catch(() => {})
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (!isMobile) handleDistrictHover(null)
+                  }}
+                  onClick={() => {
+                    if (isMobile) {
+                      if (hoveredDistrict === district.id) {
+                        handleDistrictClick(district)
+                      } else {
+                        setSelectedDistrict(district.id)
+                        handleDistrictHover(district)
+                      }
+                    } else {
+                      handleDistrictClick(district)
+                    }
+                  }}
+                  animate={{
+                    scale: isSelected ? 1.08 : isHovered ? 1.03 : 1,
+                    opacity: isDimmed ? 0.35 : 1,
+                  }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
                 />
+
+                <rect
+                  x={pathData.labelX - 38}
+                  y={pathData.labelY - 12}
+                  width="76"
+                  height="18"
+                  rx="9"
+                  fill="rgba(0,0,0,0.32)"
+                  pointerEvents="none"
+                />
+
                 <text
                   x={pathData.labelX}
                   y={pathData.labelY}
                   textAnchor="middle"
                   className="pointer-events-none select-none"
-                  fill="hsl(var(--foreground))"
-                  fontSize="11"
-                  fontWeight="500"
-                  opacity={isHovered ? 1 : 0.75}
-                  style={{ fontFamily: 'var(--font-serif)' }}
+                  fill="white"
+                  fontSize="12"
+                  fontWeight="700"
+                  opacity={isDimmed ? 0.35 : isHovered ? 1 : 0.82}
+                  style={{ fontFamily: 'var(--font-cinzel, var(--font-serif))' }}
+                  stroke="rgba(0,0,0,0.72)"
+                  strokeWidth="1.4"
+                  paintOrder="stroke"
+                  letterSpacing="0.08em"
                 >
                   {district.name}
                 </text>
               </g>
             )
           })}
-        </g>
+        </motion.g>
 
-        {/* ===== CAMADA 3: Micro-detalhes (pequenos ícones clicáveis) ===== */}
+        {/* ===== CAMADA 3: Micro-detalhes ===== */}
         <g className="micro-details">
           {microDetails.map((detail) => {
             const isHovered = hoveredElement?.id === detail.id
-            
+
             return (
               <g
                 key={detail.id}
                 transform={`translate(${detail.cx}, ${detail.cy})`}
                 className="cursor-pointer"
-                onClick={(e) => handleMicroClick(detail, e)}
-                onMouseEnter={() => setHoveredElement({ id: detail.id, type: 'micro' })}
-                onMouseLeave={() => setHoveredElement(null)}
+                onMouseEnter={() => !isMobile && handleElementInteraction({ id: detail.id, type: 'micro' })}
+                onMouseLeave={() => !isMobile && setHoveredElement(null)}
+                onClick={(e) => {
+                  handleMicroClick(detail, e)
+                  handleElementInteraction({ id: detail.id, type: 'micro' }, e)
+                }}
               >
                 <motion.circle
                   r={isHovered ? 5 : 3}
@@ -525,18 +705,19 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
           })}
         </g>
 
-        {/* ===== CAMADA 4: Elementos suspeitos (hover mostra texto) ===== */}
+        {/* ===== CAMADA 4: Elementos suspeitos ===== */}
         <g className="suspect-elements">
           {suspectElements.map((element) => {
             const isHovered = hoveredElement?.id === element.id
-            
+
             return (
               <g
                 key={element.id}
                 transform={`translate(${element.cx}, ${element.cy})`}
                 className="cursor-pointer"
-                onMouseEnter={() => setHoveredElement({ id: element.id, type: 'suspect' })}
-                onMouseLeave={() => setHoveredElement(null)}
+                onMouseEnter={() => !isMobile && handleElementInteraction({ id: element.id, type: 'suspect' })}
+                onMouseLeave={() => !isMobile && setHoveredElement(null)}
+                onClick={(e) => handleElementInteraction({ id: element.id, type: 'suspect' }, e)}
               >
                 <motion.g
                   fill="hsl(var(--muted-foreground))"
@@ -552,11 +733,11 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
           })}
         </g>
 
-        {/* ===== CAMADA 5: Falsos pontos (parecem secretos, mas não são) ===== */}
+        {/* ===== CAMADA 5: Falsos pontos ===== */}
         <g className="false-elements">
-          {falseElements.map((element) => {
+          {falseElements.map((element, index) => {
             const isHovered = hoveredElement?.id === element.id
-            
+
             return (
               <motion.circle
                 key={element.id}
@@ -566,13 +747,14 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 fill="hsl(var(--muted-foreground))"
                 opacity={isHovered ? 0.3 : element.opacity}
                 className="cursor-pointer"
-                onMouseEnter={() => setHoveredElement({ id: element.id, type: 'false' })}
-                onMouseLeave={() => setHoveredElement(null)}
+                onMouseEnter={() => !isMobile && handleElementInteraction({ id: element.id, type: 'false' })}
+                onMouseLeave={() => !isMobile && setHoveredElement(null)}
+                onClick={(e) => handleElementInteraction({ id: element.id, type: 'false' }, e)}
                 animate={{
                   opacity: isHovered ? 0.3 : [element.opacity * 0.7, element.opacity, element.opacity * 0.7],
                 }}
                 transition={{
-                  duration: isHovered ? 0.15 : 5 + Math.random() * 3,
+                  duration: isHovered ? 0.15 : 5 + index * 0.25,
                   repeat: isHovered ? 0 : Infinity,
                   ease: 'easeInOut',
                 }}
@@ -581,7 +763,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
           })}
         </g>
 
-        {/* ===== CAMADA 6: Elementos secretos REAIS (muito sutis) ===== */}
+        {/* ===== CAMADA 6: Elementos secretos REAIS ===== */}
         <g className="secret-elements">
           {secretElements.map((secret) => {
             const isDiscovered = discoveredSecrets.includes(secret.id)
@@ -593,9 +775,26 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 key={secret.id}
                 transform={`translate(${secret.cx}, ${secret.cy})`}
                 className="cursor-pointer"
-                onClick={(e) => handleSecretClick(secret.id, e)}
-                onMouseEnter={() => setHoveredElement({ id: secret.id, type: 'secret' })}
-                onMouseLeave={() => setHoveredElement(null)}
+                onClick={(e) => {
+                  if (isMobile) {
+                    e.stopPropagation()
+
+                    if (hoveredElement?.id === secret.id && hoveredElement.type === 'secret') {
+                      handleSecretClick(secret.id, e)
+                    } else {
+                      showMobileTooltip(secret.id, 'secret')
+                    }
+                    return
+                  }
+
+                  handleSecretClick(secret.id, e)
+                }}
+                onMouseEnter={() => {
+                  if (!isMobile) setHoveredElement({ id: secret.id, type: 'secret' })
+                }}
+                onMouseLeave={() => {
+                  if (!isMobile) setHoveredElement(null)
+                }}
               >
                 <motion.g
                   fill={isDiscovered ? 'hsl(var(--gold))' : 'hsl(var(--muted-foreground))'}
@@ -607,7 +806,7 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                     scale: isClicked ? 1.5 : isHovered ? 1.2 : 1,
                   }}
                   transition={{
-                    duration: isDiscovered || isHovered || isClicked ? 0.2 : 4 + Math.random() * 2,
+                    duration: isDiscovered || isHovered || isClicked ? 0.2 : 4 + secret.cx * 0.001,
                     repeat: (isDiscovered || isHovered || isClicked) ? 0 : Infinity,
                     ease: 'easeInOut',
                   }}
@@ -637,15 +836,19 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
                 fillOpacity="0.95"
                 stroke="hsl(var(--border))"
                 strokeWidth="0.5"
+                pointerEvents="none"
               />
               <text
                 x={microText.x}
                 y={microText.y + 3}
                 textAnchor="middle"
                 fill="hsl(var(--foreground))"
-                fontSize="9"
                 opacity="0.9"
-                style={{ fontFamily: 'var(--font-sans)' }}
+                fontSize="12"
+                fontWeight="600"
+                letterSpacing="0.08em"
+                style={{ fontFamily: 'var(--font-cinzel, var(--font-serif))' }}
+                pointerEvents="none"
               >
                 {microText.text}
               </text>
@@ -662,21 +865,20 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
           fontSize="13"
           opacity="0.5"
           letterSpacing="0.2em"
-          style={{ fontFamily: 'var(--font-serif)' }}
+          style={{ fontFamily: 'var(--font-cormorant, var(--font-serif))' }}
+          pointerEvents="none"
         >
           CIDADE DE HELOS
         </text>
 
         {/* Bússola sutil */}
-        <g transform="translate(600, 480)" opacity="0.4">
+        <g transform="translate(600, 480)" opacity="0.4" pointerEvents="none">
           <circle r="12" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" />
           <text y="-4" textAnchor="middle" fill="hsl(var(--foreground))" fontSize="8">N</text>
           <line y1="-8" y2="-2" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
         </g>
       </svg>
 
-      {/* ===== TOOLTIPS FLUTUANTES ===== */}
-      
       {/* Tooltip para elementos suspeitos/secretos */}
       <AnimatePresence>
         {currentTooltip && (
@@ -684,33 +886,46 @@ export function CityMap({ onDistrictHover, onSecretFound, discoveredSecrets = []
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 5 }}
-            className="absolute bottom-4 left-4 pointer-events-none"
+            className={`absolute bottom-4 pointer-events-none ${
+              isMobile
+                ? 'left-1/2 -translate-x-1/2 w-[92%] max-w-sm'
+                : 'left-4'
+            }`}
           >
             <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg px-4 py-2.5 shadow-lg max-w-xs">
               <p className="text-xs text-muted-foreground mb-0.5">{currentTooltip.label}</p>
-              <p className="text-sm text-foreground/90 italic">{currentTooltip.hint}</p>
+              <p className="text-sm text-foreground/90 italic leading-relaxed">{currentTooltip.hint}</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Tooltip do distrito (quando hover no distrito, não em elementos) */}
+      {/* Tooltip do distrito */}
       <AnimatePresence>
         {hoveredDistrict && !hoveredElement && (
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 5 }}
-            className="absolute bottom-4 left-4 right-4 pointer-events-none"
+            className={`absolute bottom-4 pointer-events-none ${
+              isMobile
+                ? 'left-1/2 -translate-x-1/2 w-[92%] max-w-sm'
+                : 'left-4 right-auto'
+            }`}
           >
-            <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-4 max-w-sm shadow-lg">
-              <h3 className="text-primary font-semibold" style={{ fontFamily: 'var(--font-serif)' }}>
+            <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-4 shadow-lg max-w-sm">
+              <h3
+                className="text-primary font-semibold"
+                style={{ fontFamily: 'var(--font-cinzel, var(--font-serif))' }}
+              >
                 {districts.find(d => d.id === hoveredDistrict)?.name}
               </h3>
               <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                 {districts.find(d => d.id === hoveredDistrict)?.atmosphere}
               </p>
-              <p className="text-xs text-gold/60 mt-2">Clique para explorar</p>
+              <p className="text-xs text-gold/60 mt-2">
+                {isMobile ? 'Toque novamente para entrar' : 'Clique para explorar'}
+              </p>
             </div>
           </motion.div>
         )}

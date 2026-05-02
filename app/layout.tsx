@@ -5,6 +5,17 @@ import '@fontsource/crimson-text/400.css'
 import '@fontsource/crimson-text/600.css'
 import '@fontsource/crimson-text/700.css'
 import './globals.css'
+import { Cinzel, Cormorant_Garamond } from 'next/font/google'
+
+export const cinzel = Cinzel({
+  subsets: ['latin'],
+  variable: '--font-cinzel',
+})
+
+export const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  variable: '--font-cormorant',
+})
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -49,7 +60,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="dark bg-background" data-scroll-behavior="smooth">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${cinzel.variable} ${cormorant.variable}`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
